@@ -1,0 +1,16 @@
+name = "multitenant-dashboard"
+main = "src/index.ts"
+compatibility_date = "2023-12-01"
+
+[env.production]
+account_id = "your-account-id"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"  # Available in your Worker as env.DB
+database_name = "multitenant_db"
+database_id = "your-database-id"  # Get this from wrangler d1 create
+migrations_dir = "./migrations"
+
+[vars]
+ENVIRONMENT = "production"
