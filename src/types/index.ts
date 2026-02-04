@@ -4,6 +4,7 @@
 declare global {
   var crypto: {
     subtle: any;
+    randomUUID(): string;
   };
   class TextEncoder {
     encode(input?: string): Uint8Array;
@@ -35,11 +36,11 @@ export interface GatewayCredentials {
   // OpenPix/Woovi credentials
   appId?: string;
   apiKey?: string;
-  
+
   // JunglePay credentials
   junglePublicKey?: string;
   jungleSecretKey?: string;
-  
+
   // Dias Marketplace credentials
   diasApiKey?: string;
   withdrawalToken?: string;
@@ -58,6 +59,29 @@ export interface Session {
   tenant_id: string;
   expires_at: number;
   created_at: number;
+}
+
+export interface Payer {
+  name: string;
+  tax_id: string; // CPF or CNPJ
+  email: string;
+  phone?: string;
+}
+
+export interface CreditCardData {
+  token: string;
+  installments: number;
+}
+
+export interface UnifiedPaymentRequest {
+  amount: number; // in cents
+  method: 'pix' | 'credit_card' | 'boleto';
+  description: string;
+  external_id?: string;
+  gateway_id?: number; // Optional: specify which gateway to use
+  callback_url?: string;
+  payer: Payer;
+  credit_card?: CreditCardData;
 }
 
 export interface GatewayCardProps {

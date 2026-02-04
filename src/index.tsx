@@ -89,26 +89,72 @@ type ChargeVariables = {
     tenantId: string;
 };
 
+import { UnifiedPaymentRequest } from "./types";
+import { getGatewaysByTenant, getGatewayById } from "./db/queries";
+import { mapToWoovi, mapToJunglePay, mapToDiasMarketplace } from "./utils/gatewayMapper";
+
 app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: { DB: any }; Variables: ChargeVariables }>) => {
-    const userId = c.get("userId");
     const tenantId = c.get("tenantId");
 
     try {
-        const { amount, currency, gatewayType } = await c.req.json();
+        const body = await c.req.json() as UnifiedPaymentRequest;
 
+        // 1. Find the appropriate gateway
+        let gateway;
+        if (body.gateway_id) {
+            gateway = await getGatewayById(c.env.DB, body.gateway_id, tenantId);
+        } else {
+            const gateways = await getGatewaysByTenant(c.env.DB, tenantId);
+            gateway = gateways[0]; // Simple selection: use the first active gateway
+        }
+
+        if (!gateway) {
+            return c.json({ success: false, error: 'No active gateway found for this tenant' }, 404);
+        }
+
+        const credentials = JSON.parse(gateway.credentials_json);
+        let mappedPayload;
+        let endpoint = '';
+
+        // 2. Map payload and set endpoint based on gateway type
+        switch (gateway.type) {
+            case 'openpix':
+                mappedPayload = mapToWoovi(body);
+                endpoint = 'https://api.woovi.com/v1/charge'; // Example endpoint
+                break;
+            case 'junglepay':
+                mappedPayload = mapToJunglePay(body);
+                endpoint = 'https://api.junglepagamentos.com/v1/transactions';
+                break;
+            case 'diasmarketplace':
+                mappedPayload = mapToDiasMarketplace(body);
+                endpoint = 'https://api.diasmarketplace.com.br/v1/payment';
+                break;
+            default:
+                return c.json({ success: false, error: 'Unsupported gateway type' }, 400);
+        }
+
+        // 3. Log the mapping result (in a real scenario, we would perform a fetch here)
+        console.log(`Processing unified charge via ${gateway.type}:`, {
+            gatewayId: gateway.id,
+            mappedPayload
+        });
+
+        // Mocking the successful gateway response
         return c.json({
             success: true,
-            transactionId: `txn_${Date.now()}_${userId}`,
-            amount,
-            currency,
-            gatewayUsed: gatewayType || 'auto',
-            message: 'Charge processed successfully through the unified gateway',
-            timestamp: new Date().toISOString()
+            gateway: gateway.type,
+            gatewayTransactionId: `gw_${Math.random().toString(36).substring(7)}`,
+            amount: body.amount,
+            message: 'Payment processed successfully through unified API',
+            mappedPayload // Returning mapped payload for demonstration/debug
         });
+
     } catch (error) {
+        console.error('Unified charge error:', error);
         return c.json({
             success: false,
-            error: 'Failed to process charge',
+            error: 'Failed to process unified charge',
             message: error instanceof Error ? error.message : 'Unknown error'
         }, 500);
     }
