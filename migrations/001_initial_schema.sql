@@ -11,9 +11,9 @@ CREATE TABLE users (
 CREATE TABLE gateways (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL, -- e.g., 'stripe', 'paypal', 'square'
+  type TEXT NOT NULL, -- 'openpix', 'junglepay', 'diasmarketplace'
   tenant_id TEXT NOT NULL,
-  credentials_json TEXT NOT NULL, -- Encrypted JSON containing gateway credentials
+  credentials_json TEXT NOT NULL, -- JSON containing gateway credentials (encrypted in production)
   is_active BOOLEAN DEFAULT 1,
   created_at INTEGER DEFAULT (unixepoch()),
   FOREIGN KEY (tenant_id) REFERENCES users(tenant_id)

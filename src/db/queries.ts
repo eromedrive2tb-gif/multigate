@@ -53,3 +53,40 @@ export const createUser = async (db: D1Database, email: string, passwordHash: st
     "INSERT INTO users (email, password_hash, tenant_id) VALUES (?, ?, ?)"
   ).bind(email, passwordHash, tenantId).run();
 };
+
+// Gateway-specific functions
+export const createGateway = async (db: D1Database, name: string, type: 'openpix' | 'junglepay' | 'diasmarketplace', tenantId: string, credentials: any) => {
+  const credentialsJson = JSON.stringify(credentials);
+  
+  console.log('About to insert gateway:', { name, type, tenantId });
+  
+  await db.prepare(
+    "INSERT INTO gateways (name, type, tenant_id, credentials_json) VALUES (?, ?, ?, ?)"
+  ).bind(name, type, tenantId, credentialsJson).run();
+  
+  console.log('Gateway inserted successfully');
+};
+
+export const updateGatewayCredentials = async (db: D1Database, gatewayId: number, tenantId: string, credentials: any) => {
+  const credentialsJson = JSON.stringify(credentials);
+  
+  await db.prepare(
+    "UPDATE gateways SET credentials_json = ? WHERE id = ? AND tenant_id = ?"
+  ).bind(credentialsJson, gatewayId, tenantId).run();
+};
+
+export const getGatewayById = async (db: D1Database, gatewayId: number, tenantId: string) => {
+  return await db.prepare(
+    "SELECT id, name, type, credentials_json, is_active FROM gateways WHERE id = ? AND tenant_id = ?"
+  ).bind(gatewayId, tenantId).first<any>();
+};
+
+export const deleteGateway = async (db: D1Database, gatewayId: number, tenantId: string) => {
+  await db.prepare(
+    "DELETE FROM gateways WHERE id = ? AND tenant_id = ?"
+  ).bind(gatewayId, tenantId).run();
+};
+
+export const getAllowedGatewayTypes = (): Array<'openpix' | 'junglepay' | 'diasmarketplace'> => {
+  return ['openpix', 'junglepay', 'diasmarketplace'];
+};

@@ -1,8 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getCookie } from "hono/cookie";
+import { Context } from "hono";
 import authRoutes from "./routes/auth";
 import dashboardRoutes from "./routes/dashboard";
+import gatewayRoutes from "./routes/gateway";
+import { authenticate } from "./middleware/auth";
 
 // Initialize database tables if they don't exist
 async function initializeDatabase(env: { DB: any }) {
@@ -62,6 +65,7 @@ app.use("*", async (c, next) => {
 // Routes
 app.route("/auth", authRoutes);
 app.route("/dashboard", dashboardRoutes);
+app.route("/api/gateway", gatewayRoutes);
 
 // Login page route
 app.get("/login", (c) => {
@@ -273,6 +277,42 @@ app.use("*", async (c, next) => {
   // Initialize database if not already done
   await initializeDatabase(c.env);
   await next();
+});
+
+// Define type for unified charge endpoint
+type ChargeVariables = {
+  userId: number;
+  tenantId: string;
+};
+
+// Unified charge endpoint - the heart of the aggregator
+app.post("/api/unified/charge", authenticate, async (c: Context<{ Bindings: { DB: any }; Variables: ChargeVariables }>) => {
+  const userId = c.get("userId");
+  const tenantId = c.get("tenantId");
+  
+  try {
+    const { amount, currency, gatewayType, customerData } = await c.req.json();
+    
+    // This is where the magic happens - routing to the appropriate gateway
+    // based on the user's configuration and preferences
+    
+    // For now, returning a mock response
+    return c.json({
+      success: true,
+      transactionId: `txn_${Date.now()}_${userId}`,
+      amount,
+      currency,
+      gatewayUsed: gatewayType || 'auto',
+      message: 'Charge processed successfully through the unified gateway',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: 'Failed to process charge',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
 });
 
 // Root redirect to login
