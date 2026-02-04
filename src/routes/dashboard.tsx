@@ -1,0 +1,54 @@
+/** @jsxImportSource hono/jsx */
+
+import { Hono } from "hono";
+import { authenticate } from "../middleware/auth";
+import { getGatewaysByTenant, getUserById, updateUserApiToken } from "../db/queries";
+import { generateSecureToken } from "../utils/crypto";
+import { Dashboard } from "../components/Dashboard";
+
+type Variables = {
+    userId: number;
+    tenantId: string;
+};
+
+const dashboardRoutes = new Hono<{ Bindings: { DB: any }; Variables: Variables }>();
+
+dashboardRoutes.use("*", authenticate); // Apply authentication to all dashboard routes
+
+dashboardRoutes.get("/", async (c) => {
+    const tenantId = c.get("tenantId");
+    const userId = c.get("userId");
+
+    // Fetch gateways for this tenant only
+    const gateways = await getGatewaysByTenant(c.env.DB, tenantId);
+    const configuredTypes = gateways.map((g: any) => g.type);
+
+    // Fetch user's aggregator API token from DB
+    let user = await getUserById(c.env.DB, userId, tenantId);
+
+    let aggregatorToken = user?.api_token;
+
+    // If no token exists, generate one
+    if (!aggregatorToken) {
+        aggregatorToken = generateSecureToken();
+        await updateUserApiToken(c.env.DB, userId, aggregatorToken);
+    }
+
+    return c.html(
+        <Dashboard
+            user={user}
+            gateways={gateways}
+            configuredTypes={configuredTypes}
+            aggregatorToken={aggregatorToken}
+        />
+    );
+});
+
+dashboardRoutes.post("/regenerate-token", async (c) => {
+    const userId = c.get("userId");
+    const newToken = generateSecureToken();
+    await updateUserApiToken(c.env.DB, userId, newToken);
+    return c.json({ success: true, token: newToken });
+});
+
+export default dashboardRoutes;
