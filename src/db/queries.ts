@@ -27,7 +27,7 @@ export const getGatewaysByTenant = async (db: D1Database, tenantId: string) => {
 
 export const getUserByEmail = async (db: D1Database, email: string) => {
   return await db.prepare(
-    "SELECT id, email, password_hash, tenant_id, api_token FROM users WHERE email = ?"
+    "SELECT id, email, password_hash, tenant_id, api_token FROM users WHERE LOWER(email) = LOWER(?)"
   ).bind(email).first<{ id: number, email: string, password_hash: string, tenant_id: string, api_token: string | null }>();
 };
 
