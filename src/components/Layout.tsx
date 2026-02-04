@@ -3,7 +3,7 @@
 import { html } from "hono/html";
 
 export const Layout = ({ children, title }: { children: any; title: string }) => {
-    return html`
+  return html`
     <!DOCTYPE html>
     <html lang="en">
       <head>
@@ -14,6 +14,8 @@ export const Layout = ({ children, title }: { children: any; title: string }) =>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
         <script src="https://unpkg.com/lucide@latest"></script>
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+        <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/json-enc.js"></script>
         <style>
           :root {
             --bg-body: #0a0a0c;
@@ -183,6 +185,26 @@ export const Layout = ({ children, title }: { children: any; title: string }) =>
         </div>
         <script>
           lucide.createIcons();
+          
+          // Global HTMX nesting for credentials
+          document.body.addEventListener('htmx:configRequest', (event) => {
+            const vals = event.detail.parameters;
+            const credentials = {};
+            let hasCredentials = false;
+            
+            for (const key in vals) {
+              if (key.startsWith('credentials.')) {
+                const subKey = key.split('.')[1];
+                credentials[subKey] = vals[key];
+                delete vals[key];
+                hasCredentials = true;
+              }
+            }
+            
+            if (hasCredentials) {
+              event.detail.parameters.credentials = credentials;
+            }
+          });
         </script>
       </body>
     </html>
