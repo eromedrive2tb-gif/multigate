@@ -5,7 +5,7 @@ import { Context } from "hono";
 import authRoutes from "./routes/auth";
 import dashboardRoutes from "./routes/dashboard";
 import gatewayRoutes from "./routes/gateway";
-import { authenticate } from "./middleware/auth";
+import { authenticate, apiAuthenticate } from "./middleware/auth";
 
 // Initialize database tables if they don't exist
 async function initializeDatabase(env: { DB: any }) {
@@ -16,9 +16,20 @@ async function initializeDatabase(env: { DB: any }) {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       tenant_id TEXT NOT NULL,
+      api_token TEXT UNIQUE,
       created_at INTEGER DEFAULT (unixepoch())
     )`).run();
-    
+
+    // Check if api_token column exists (for older databases)
+    try {
+      await env.DB.prepare("SELECT api_token FROM users LIMIT 1").run();
+    } catch (e) {
+      // Column doesn't exist, add it (SQLite doesn't support adding UNIQUE columns via ALTER TABLE)
+      await env.DB.prepare("ALTER TABLE users ADD COLUMN api_token TEXT").run();
+      // Create a unique index instead
+      await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_token ON users(api_token)").run();
+    }
+
     // Create gateways table
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS gateways (
       id INTEGER PRIMARY KEY,
@@ -27,10 +38,9 @@ async function initializeDatabase(env: { DB: any }) {
       tenant_id TEXT NOT NULL,
       credentials_json TEXT NOT NULL,
       is_active BOOLEAN DEFAULT 1,
-      created_at INTEGER DEFAULT (unixepoch()),
-      FOREIGN KEY (tenant_id) REFERENCES users(tenant_id)
+      created_at INTEGER DEFAULT (unixepoch())
     )`).run();
-    
+
     // Create sessions table
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -286,16 +296,16 @@ type ChargeVariables = {
 };
 
 // Unified charge endpoint - the heart of the aggregator
-app.post("/api/unified/charge", authenticate, async (c: Context<{ Bindings: { DB: any }; Variables: ChargeVariables }>) => {
+app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: { DB: any }; Variables: ChargeVariables }>) => {
   const userId = c.get("userId");
   const tenantId = c.get("tenantId");
-  
+
   try {
     const { amount, currency, gatewayType, customerData } = await c.req.json();
-    
+
     // This is where the magic happens - routing to the appropriate gateway
     // based on the user's configuration and preferences
-    
+
     // For now, returning a mock response
     return c.json({
       success: true,
@@ -307,8 +317,8 @@ app.post("/api/unified/charge", authenticate, async (c: Context<{ Bindings: { DB
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    return c.json({ 
-      success: false, 
+    return c.json({
+      success: false,
       error: 'Failed to process charge',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, 500);

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { authenticate } from "../middleware/auth";
-import { getGatewaysByTenant } from "../db/queries";
+import { getGatewaysByTenant, getUserById, updateUserApiToken } from "../db/queries";
+import { generateSecureToken } from "../utils/crypto";
 
 type Variables = {
   userId: number;
@@ -13,14 +14,22 @@ dashboardRoutes.use("*", authenticate); // Apply authentication to all dashboard
 
 dashboardRoutes.get("/", async (c) => {
   const tenantId = c.get("tenantId");
-  
+
   // Fetch gateways for this tenant only
   const result = await getGatewaysByTenant(c.env.DB, tenantId);
-  
-  // Fetch user's aggregator API token
+
+  // Fetch user's aggregator API token from DB
   const userId = c.get("userId");
-  const aggregatorToken = `agg_${tenantId.substring(0, 8)}_${userId}`; // Simplified token generation
-  
+  let user = await getUserById(c.env.DB, userId, tenantId);
+
+  let aggregatorToken = user?.api_token;
+
+  // If no token exists, generate one
+  if (!aggregatorToken) {
+    aggregatorToken = generateSecureToken();
+    await updateUserApiToken(c.env.DB, userId, aggregatorToken);
+  }
+
   // Return HTML response with gateway cards
   return c.html(`
     <!DOCTYPE html>
@@ -68,19 +77,22 @@ dashboardRoutes.get("/", async (c) => {
             <h2>Your Aggregator API Token</h2>
             <p>Use this token to make requests to our unified gateway endpoint:</p>
             <div class="api-token-display" id="apiTokenDisplay">${aggregatorToken}</div>
-            <button class="copy-token-btn" onclick="copyToken()">Copy Token</button>
+            <div style="display: flex; gap: 10px;">
+              <button class="copy-token-btn" onclick="copyToken()">Copy Token</button>
+              <button class="copy-token-btn" style="background: #e67e22;" onclick="regenerateToken()">Regenerate Token</button>
+            </div>
             <p style="margin-top: 10px;"><small>Endpoint: <code>POST /api/unified/charge</code> with <code>Authorization: Bearer ${aggregatorToken}</code></small></p>
           </section>
           
           <h2>Payment Gateways</h2>
           <div class="gateway-grid" id="gateways-container">
             ${result.length > 0 ? result.map((gateway: any) => {
-              let credentialFields = '';
-              try {
-                const creds = JSON.parse(gateway.credentials_json);
-                
-                if (gateway.type === 'openpix') {
-                  credentialFields = `
+    let credentialFields = '';
+    try {
+      const creds = JSON.parse(gateway.credentials_json);
+
+      if (gateway.type === 'openpix') {
+        credentialFields = `
                     <div class="credential-item">
                       <label class="credential-label">App ID:</label>
                       <input type="text" class="credential-input" id="openpix-appId-${gateway.id}" value="${creds.appId || ''}" placeholder="Enter App ID">
@@ -90,8 +102,8 @@ dashboardRoutes.get("/", async (c) => {
                       <input type="password" class="credential-input" id="openpix-apiKey-${gateway.id}" value="${creds.apiKey || ''}" placeholder="Enter API Key">
                     </div>
                   `;
-                } else if (gateway.type === 'junglepay') {
-                  credentialFields = `
+      } else if (gateway.type === 'junglepay') {
+        credentialFields = `
                     <div class="credential-item">
                       <label class="credential-label">Public Key:</label>
                       <input type="text" class="credential-input" id="junglepay-publicKey-${gateway.id}" value="${creds.junglePublicKey || ''}" placeholder="Enter Public Key">
@@ -101,8 +113,8 @@ dashboardRoutes.get("/", async (c) => {
                       <input type="password" class="credential-input" id="junglepay-secretKey-${gateway.id}" value="${creds.jungleSecretKey || ''}" placeholder="Enter Secret Key">
                     </div>
                   `;
-                } else if (gateway.type === 'diasmarketplace') {
-                  credentialFields = `
+      } else if (gateway.type === 'diasmarketplace') {
+        credentialFields = `
                     <div class="credential-item">
                       <label class="credential-label">API Key:</label>
                       <input type="text" class="credential-input" id="dias-apiKey-${gateway.id}" value="${creds.diasApiKey || ''}" placeholder="Enter API Key">
@@ -112,12 +124,12 @@ dashboardRoutes.get("/", async (c) => {
                       <input type="password" class="credential-input" id="dias-withdrawal-${gateway.id}" value="${creds.withdrawalToken || ''}" placeholder="Enter Withdrawal Token">
                     </div>
                   `;
-                }
-              } catch (e) {
-                credentialFields = '<div class="credential-item">Error loading credentials</div>';
-              }
-              
-              return `
+      }
+    } catch (e) {
+      credentialFields = '<div class="credential-item">Error loading credentials</div>';
+    }
+
+    return `
                 <div class="gateway-card">
                   <h3>${gateway.name}</h3>
                   <div class="gateway-info">
@@ -133,7 +145,7 @@ dashboardRoutes.get("/", async (c) => {
                   </div>
                 </div>
               `;
-            }).join('') : ''}
+  }).join('') : ''}
             
             <!-- Gateway configuration cards for users with no gateways configured -->
             <div class="gateway-card" id="openpix-card">
@@ -215,6 +227,29 @@ dashboardRoutes.get("/", async (c) => {
             navigator.clipboard.writeText(tokenElement.textContent).then(() => {
               alert('API Token copied to clipboard!');
             });
+          }
+          
+          async function regenerateToken() {
+            if (!confirm('Are you sure you want to regenerate your API token? The old one will stop working immediately.')) {
+              return;
+            }
+            
+            try {
+              const response = await fetch('/dashboard/regenerate-token', { 
+                method: 'POST',
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                document.getElementById('apiTokenDisplay').textContent = data.token;
+                alert('API Token regenerated successfully!');
+                window.location.reload(); // Reload to update code examples
+              } else {
+                alert('Error regenerating token');
+              }
+            } catch (error) {
+              alert('Error connecting to server');
+            }
           }
           
           async function saveCredentials(gatewayType, gatewayId) {
@@ -312,6 +347,13 @@ dashboardRoutes.get("/", async (c) => {
       </body>
     </html>
   `);
+});
+
+dashboardRoutes.post("/regenerate-token", async (c) => {
+  const userId = c.get("userId");
+  const newToken = generateSecureToken();
+  await updateUserApiToken(c.env.DB, userId, newToken);
+  return c.json({ success: true, token: newToken });
 });
 
 export default dashboardRoutes;

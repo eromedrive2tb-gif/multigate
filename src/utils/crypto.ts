@@ -1,16 +1,27 @@
-// Simple password hashing functions for the application
-// In production, use a proper library like bcrypt or argon2
+import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto";
 
-export const hashPassword = async (password: string): Promise<string> => {
-  // Create a simple hash using Web Crypto API
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
+/**
+ * Hashes a password using scrypt.
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = scryptSync(password, salt, 64);
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
 
-export const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
-};
+/**
+ * Verifies a password against a hash.
+ */
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const [salt, key] = hash.split(":");
+  const derivedKey = scryptSync(password, salt, 64);
+  return timingSafeEqual(derivedKey, Buffer.from(key, "hex"));
+}
+
+/**
+ * Generates a secure random token with a prefix.
+ */
+export function generateSecureToken(prefix: string = 'mg', length: number = 32): string {
+  const randomPart = randomBytes(length).toString('hex');
+  return `${prefix}_${randomPart}`;
+}

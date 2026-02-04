@@ -14,8 +14,8 @@ interface D1PreparedStatement {
 
 export const getUserById = async (db: D1Database, userId: number, tenantId: string) => {
   return await db.prepare(
-    "SELECT id, email FROM users WHERE id = ? AND tenant_id = ?"
-  ).bind(userId, tenantId).first<{id: number, email: string}>();
+    "SELECT id, email, api_token FROM users WHERE id = ? AND tenant_id = ?"
+  ).bind(userId, tenantId).first<{ id: number, email: string, api_token: string | null }>();
 };
 
 export const getGatewaysByTenant = async (db: D1Database, tenantId: string) => {
@@ -27,18 +27,30 @@ export const getGatewaysByTenant = async (db: D1Database, tenantId: string) => {
 
 export const getUserByEmail = async (db: D1Database, email: string) => {
   return await db.prepare(
-    "SELECT id, email, password_hash, tenant_id FROM users WHERE email = ?"
-  ).bind(email).first<{id: number, email: string, password_hash: string, tenant_id: string}>();
+    "SELECT id, email, password_hash, tenant_id, api_token FROM users WHERE email = ?"
+  ).bind(email).first<{ id: number, email: string, password_hash: string, tenant_id: string, api_token: string | null }>();
+};
+
+export const getUserByApiToken = async (db: D1Database, token: string) => {
+  return await db.prepare(
+    "SELECT id, email, tenant_id FROM users WHERE api_token = ?"
+  ).bind(token).first<{ id: number, email: string, tenant_id: string }>();
+};
+
+export const updateUserApiToken = async (db: D1Database, userId: number, token: string) => {
+  await db.prepare(
+    "UPDATE users SET api_token = ? WHERE id = ?"
+  ).bind(token, userId).run();
 };
 
 export const createSession = async (db: D1Database, userId: number, tenantId: string) => {
-  const sessionId = Array.from({length: 16}, () => Math.random().toString(36)[2]).join('');
+  const sessionId = Array.from({ length: 16 }, () => Math.random().toString(36)[2]).join('');
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  
+
   await db.prepare(
     "INSERT INTO sessions (id, user_id, tenant_id, expires_at) VALUES (?, ?, ?, ?)"
   ).bind(sessionId, userId, tenantId, expiresAt).run();
-  
+
   return sessionId;
 };
 
@@ -57,19 +69,19 @@ export const createUser = async (db: D1Database, email: string, passwordHash: st
 // Gateway-specific functions
 export const createGateway = async (db: D1Database, name: string, type: 'openpix' | 'junglepay' | 'diasmarketplace', tenantId: string, credentials: any) => {
   const credentialsJson = JSON.stringify(credentials);
-  
+
   console.log('About to insert gateway:', { name, type, tenantId });
-  
+
   await db.prepare(
     "INSERT INTO gateways (name, type, tenant_id, credentials_json) VALUES (?, ?, ?, ?)"
   ).bind(name, type, tenantId, credentialsJson).run();
-  
+
   console.log('Gateway inserted successfully');
 };
 
 export const updateGatewayCredentials = async (db: D1Database, gatewayId: number, tenantId: string, credentials: any) => {
   const credentialsJson = JSON.stringify(credentials);
-  
+
   await db.prepare(
     "UPDATE gateways SET credentials_json = ? WHERE id = ? AND tenant_id = ?"
   ).bind(credentialsJson, gatewayId, tenantId).run();

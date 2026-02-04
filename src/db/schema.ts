@@ -6,6 +6,7 @@ export interface User {
   email: string;
   password_hash: string;
   tenant_id: string;
+  api_token: string | null;
   created_at: number;
 }
 

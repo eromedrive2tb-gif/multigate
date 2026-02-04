@@ -15,8 +15,7 @@ CREATE TABLE gateways (
   tenant_id TEXT NOT NULL,
   credentials_json TEXT NOT NULL, -- JSON containing gateway credentials (encrypted in production)
   is_active BOOLEAN DEFAULT 1,
-  created_at INTEGER DEFAULT (unixepoch()),
-  FOREIGN KEY (tenant_id) REFERENCES users(tenant_id)
+  created_at INTEGER DEFAULT (unixepoch())
 );
 
 -- Sessions table for authentication

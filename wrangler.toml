@@ -1,6 +1,7 @@
 name = "multitenant-dashboard"
 main = "src/index.ts"
 compatibility_date = "2023-12-01"
+compatibility_flags = [ "nodejs_compat" ]
 
 [env.production]
 account_id = "your-account-id"
