@@ -1,21 +1,28 @@
 import { UnifiedPaymentRequest, PaymentItem } from "../types";
 
 export function mapToWoovi(request: UnifiedPaymentRequest) {
+    const customer: any = {
+        name: request.payer.name,
+        email: request.payer.email,
+        phone: request.payer.phone?.replace(/\D/g, ''),
+    };
+
+    // taxID is optional for Woovi/OpenPix
+    if (request.payer.tax_id) {
+        customer.taxID = request.payer.tax_id.replace(/\D/g, '');
+    }
+
     return {
         value: request.amount,
         correlationID: request.external_id || crypto.randomUUID(),
         comment: request.description,
-        customer: {
-            name: request.payer.name,
-            taxID: request.payer.tax_id.replace(/\D/g, ''),
-            email: request.payer.email,
-            phone: request.payer.phone?.replace(/\D/g, ''),
-        },
+        customer,
     };
 }
 
 export function mapToJunglePay(request: UnifiedPaymentRequest, aggregatorWebhookUrl?: string) {
-    const isCnpj = request.payer.tax_id.replace(/\D/g, '').length > 11;
+    // tax_id is validated at the endpoint level for JunglePay
+    const isCnpj = request.payer.tax_id!.replace(/\D/g, '').length > 11;
     const paymentMethodMap: Record<string, string> = {
         pix: 'pix',
         credit_card: 'credit_card',
@@ -29,7 +36,7 @@ export function mapToJunglePay(request: UnifiedPaymentRequest, aggregatorWebhook
             name: request.payer.name,
             email: request.payer.email,
             document: {
-                number: request.payer.tax_id.replace(/\D/g, ''),
+                number: request.payer.tax_id!.replace(/\D/g, ''),
                 type: isCnpj ? 'cnpj' : 'cpf',
             },
             phone: request.payer.phone?.replace(/\D/g, ''),
@@ -73,7 +80,8 @@ export function mapToDiasMarketplace(request: UnifiedPaymentRequest, aggregatorW
         notificationUrl: aggregatorWebhookUrl,
         payer: {
             name: request.payer.name,
-            taxId: request.payer.tax_id.replace(/\D/g, ''),
+            // tax_id is validated at the endpoint level for Dias Marketplace
+            taxId: request.payer.tax_id!.replace(/\D/g, ''),
             email: request.payer.email,
             phone: request.payer.phone?.replace(/\D/g, ''),
         },

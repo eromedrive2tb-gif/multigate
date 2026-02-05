@@ -56,7 +56,7 @@ export interface Session {
 
 export interface Payer {
   name: string;
-  tax_id: string; // CPF or CNPJ
+  tax_id?: string; // CPF or CNPJ - Optional for Woovi/OpenPix, required for JunglePay and Dias Marketplace
   email: string;
   phone?: string;
 }

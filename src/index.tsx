@@ -130,6 +130,14 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
             return c.json({ success: false, error: 'No active gateway found for this tenant' }, 404);
         }
 
+        // Validate tax_id is required for JunglePay and Dias Marketplace
+        if ((gateway.type === 'junglepay' || gateway.type === 'diasmarketplace') && !body.payer?.tax_id) {
+            return c.json({
+                success: false,
+                error: 'payer.tax_id is required for JunglePay and Dias Marketplace gateways'
+            }, 400);
+        }
+
         const credentials = JSON.parse(gateway.credentials_json);
         let mappedPayload;
         let endpoint = '';
