@@ -1,12 +1,17 @@
 // Mappers for Webhook Responses (Aggregator -> User)
 export interface UnifiedWebhookPayload {
-    event: 'PAYMENT_RECEIVED' | 'PAYMENT_FAILED';
+    event: 'CHARGE_CREATED' | 'PAYMENT_RECEIVED' | 'PAYMENT_FAILED' | 'PAYMENT_EXPIRED';
     data: {
         external_id?: string;
         gateway_transaction_id?: string;
         amount?: number;
         status: string;
         paid_at?: string;
+        pix?: {
+            qrcode?: string;
+            image?: string;
+            paymentLinkUrl?: string;
+        };
         metadata?: any;
     };
 }
@@ -36,7 +41,7 @@ export function mapWooviWebhook(payload: any): UnifiedWebhookPayload {
     const externalId = charge.correlationID || payload.pix?.customer?.correlationID || payload.pix?.payer?.correlationID;
 
     return {
-        event: status === 'PAID' ? 'PAYMENT_RECEIVED' : 'PAYMENT_FAILED',
+        event: status === 'PAID' ? 'PAYMENT_RECEIVED' : (status === 'EXPIRED' ? 'PAYMENT_EXPIRED' : 'PAYMENT_FAILED'),
         data: {
             external_id: externalId,
             gateway_transaction_id: charge.transactionID || charge.identifier,

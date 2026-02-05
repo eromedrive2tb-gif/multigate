@@ -106,6 +106,7 @@ type ChargeVariables = {
 import { UnifiedPaymentRequest } from "./types";
 import { getGatewaysByTenant, getGatewayById, getGatewayByType, createTransaction } from "./db/queries";
 import { mapToWoovi, mapToJunglePay, mapToDiasMarketplace } from "./utils/gatewayMapper";
+import { dispatchWebhook, UnifiedWebhookPayload } from "./utils/webhookMapper";
 import webhookRoutes from "./routes/webhooks";
 
 // Register Webhook Routes - No Auth required (gateways call this)
@@ -228,29 +229,53 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
 
 
         // Standardize response based on gateway
-        let standardizedResponse: any = {
-            success: true,
-            gateway: gateway.type,
-            gatewayResponse: result,
-        };
+        let pixData: any = {};
 
         if (gateway.type === 'openpix') {
-            standardizedResponse.pix = {
-                qrcode: result.charge?.qrCodeString,
+            pixData = {
+                qrcode: result.charge?.brCode || result.charge?.qrCodeString,
                 image: result.charge?.qrCodeImage,
                 paymentLinkUrl: result.charge?.paymentLinkUrl,
             };
         } else if (gateway.type === 'diasmarketplace') {
-            standardizedResponse.pix = {
+            pixData = {
                 qrcode: result.data?.copypaste,
             };
         } else if (gateway.type === 'junglepay') {
-            standardizedResponse.pix = {
+            pixData = {
                 qrcode: result.pix?.qrcode,
                 image: result.pix?.qrcode_url,
                 secureUrl: result.secureUrl,
             };
         }
+
+        // 5. Dispatch CHARGE_CREATED webhook to callback_url if provided
+        if (body.callback_url) {
+            const webhookPayload: UnifiedWebhookPayload = {
+                event: 'CHARGE_CREATED',
+                data: {
+                    external_id: externalRef,
+                    gateway_transaction_id: gatewayTransactionId || undefined,
+                    amount: body.amount,
+                    status: 'PENDING',
+                    pix: pixData,
+                }
+            };
+            // Fire and forget - don't block response
+            dispatchWebhook(body.callback_url, webhookPayload).catch(err => {
+                console.error('Failed to dispatch CHARGE_CREATED webhook:', err);
+            });
+        }
+
+        // Build final response (without full gatewayResponse for cleaner output)
+        const standardizedResponse = {
+            success: true,
+            gateway: gateway.type,
+            external_id: externalRef,
+            gateway_transaction_id: gatewayTransactionId,
+            status: 'PENDING',
+            pix: pixData,
+        };
 
         return c.json(standardizedResponse);
 
