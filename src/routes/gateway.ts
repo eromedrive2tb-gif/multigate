@@ -63,8 +63,8 @@ gatewayRoutes.post("/", async (c) => {
 
   // Validate required credentials based on type
   if (type === 'openpix') {
-    if (!credentials.appId || !credentials.apiKey) {
-      return c.json({ error: "OpenPix requires appId and apiKey" }, 400);
+    if (!credentials.appId) {
+      return c.json({ error: "OpenPix requires appId" }, 400);
     }
   } else if (type === 'junglepay') {
     if (!credentials.junglePublicKey || !credentials.jungleSecretKey) {

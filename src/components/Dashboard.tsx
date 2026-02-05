@@ -33,8 +33,7 @@ export const Dashboard = ({ user, gateways, configuredTypes, aggregatorToken }: 
         type="openpix"
         title="Add OpenPix / Woovi"
         fields={[
-          { label: 'App ID', id: 'new-openpix-appId', placeholder: 'App ID' },
-          { label: 'API Key', id: 'new-openpix-apiKey', placeholder: 'API Key', type: 'password' }
+          { label: 'App ID', id: 'new-openpix-appId', placeholder: 'App ID' }
         ]}
       />
     ),

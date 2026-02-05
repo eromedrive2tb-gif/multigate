@@ -90,7 +90,7 @@ type ChargeVariables = {
 };
 
 import { UnifiedPaymentRequest } from "./types";
-import { getGatewaysByTenant, getGatewayById } from "./db/queries";
+import { getGatewaysByTenant, getGatewayById, getGatewayByType } from "./db/queries";
 import { mapToWoovi, mapToJunglePay, mapToDiasMarketplace } from "./utils/gatewayMapper";
 
 app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: { DB: any }; Variables: ChargeVariables }>) => {
@@ -101,8 +101,8 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
 
         // 1. Find the appropriate gateway
         let gateway;
-        if (body.gateway_id) {
-            gateway = await getGatewayById(c.env.DB, body.gateway_id, tenantId);
+        if (body.gateway_type) {
+            gateway = await getGatewayByType(c.env.DB, body.gateway_type, tenantId);
         } else {
             const gateways = await getGatewaysByTenant(c.env.DB, tenantId);
             gateway = gateways[0]; // Simple selection: use the first active gateway
@@ -120,7 +120,7 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
         switch (gateway.type) {
             case 'openpix':
                 mappedPayload = mapToWoovi(body);
-                endpoint = 'https://api.woovi.com/v1/charge'; // Example endpoint
+                endpoint = 'https://api.woovi.com/api/v1/charge';
                 break;
             case 'junglepay':
                 mappedPayload = mapToJunglePay(body);
@@ -134,20 +134,49 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
                 return c.json({ success: false, error: 'Unsupported gateway type' }, 400);
         }
 
-        // 3. Log the mapping result (in a real scenario, we would perform a fetch here)
-        console.log(`Processing unified charge via ${gateway.type}:`, {
-            gatewayId: gateway.id,
-            mappedPayload
-        });
+        // 3. Process the charge (Actual fetch for OpenPix)
+        if (gateway.type === 'openpix') {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': credentials.appId,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(mappedPayload)
+            });
 
-        // Mocking the successful gateway response
+            let result;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                result = await response.text();
+            }
+
+            if (!response.ok) {
+                return c.json({
+                    success: false,
+                    error: `Woovi API error: ${response.status}`,
+                    details: result
+                }, response.status as any);
+            }
+
+            return c.json({
+                success: true,
+                gateway: 'openpix',
+                gatewayResponse: result,
+                message: 'Charge created successfully via OpenPix'
+            });
+        }
+
+        // Mocking responses for other gateways for now
         return c.json({
             success: true,
             gateway: gateway.type,
             gatewayTransactionId: `gw_${Math.random().toString(36).substring(7)}`,
             amount: body.amount,
-            message: 'Payment processed successfully through unified API',
-            mappedPayload // Returning mapped payload for demonstration/debug
+            message: 'Payment processed successfully through unified API (Mock)',
+            mappedPayload
         });
 
     } catch (error) {

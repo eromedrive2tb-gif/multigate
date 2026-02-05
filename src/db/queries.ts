@@ -93,6 +93,12 @@ export const getGatewayById = async (db: D1Database, gatewayId: number, tenantId
   ).bind(gatewayId, tenantId).first<any>();
 };
 
+export const getGatewayByType = async (db: D1Database, type: string, tenantId: string) => {
+  return await db.prepare(
+    "SELECT id, name, type, credentials_json, is_active FROM gateways WHERE type = ? AND tenant_id = ? AND is_active = 1"
+  ).bind(type, tenantId).first<any>();
+};
+
 export const deleteGateway = async (db: D1Database, gatewayId: number, tenantId: string) => {
   await db.prepare(
     "DELETE FROM gateways WHERE id = ? AND tenant_id = ?"

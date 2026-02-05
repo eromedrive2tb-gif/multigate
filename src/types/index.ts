@@ -2,15 +2,9 @@
 
 // Extend global scope to include crypto and TextEncoder
 declare global {
-  var crypto: {
-    subtle: any;
-    randomUUID(): string;
-  };
-  class TextEncoder {
-    encode(input?: string): Uint8Array;
-  }
-  class TextDecoder {
-    decode(input?: ArrayBuffer): string;
+  // Use existing Crypto type if available, otherwise fallback
+  interface Window {
+    crypto: Crypto;
   }
 }
 
@@ -35,7 +29,6 @@ export interface Gateway {
 export interface GatewayCredentials {
   // OpenPix/Woovi credentials
   appId?: string;
-  apiKey?: string;
 
   // JunglePay credentials
   junglePublicKey?: string;
@@ -78,7 +71,7 @@ export interface UnifiedPaymentRequest {
   method: 'pix' | 'credit_card' | 'boleto';
   description: string;
   external_id?: string;
-  gateway_id?: number; // Optional: specify which gateway to use
+  gateway_type?: string; // Optional: specify which gateway to use by type (e.g. 'openpix')
   callback_url?: string;
   payer: Payer;
   credit_card?: CreditCardData;

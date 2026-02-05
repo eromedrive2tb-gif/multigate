@@ -7,9 +7,9 @@ export function mapToWoovi(request: UnifiedPaymentRequest) {
         comment: request.description,
         customer: {
             name: request.payer.name,
-            taxID: request.payer.tax_id,
+            taxID: request.payer.tax_id.replace(/\D/g, ''),
             email: request.payer.email,
-            phone: request.payer.phone,
+            phone: request.payer.phone?.replace(/\D/g, ''),
         },
     };
 }

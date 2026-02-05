@@ -44,7 +44,6 @@ export const GatewayCard = ({ gateway }: GatewayCardProps) => {
                     {gateway.type === 'openpix' && (
                         <>
                             <FormField label="App ID" id={`openpix-appId-${gateway.id}`} name="credentials.appId" value={creds.appId} />
-                            <FormField label="API Key" id={`openpix-apiKey-${gateway.id}`} name="credentials.apiKey" value={creds.apiKey} type="password" />
                         </>
                     )}
 
