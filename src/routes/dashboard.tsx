@@ -62,8 +62,24 @@ dashboardRoutes.post("/regenerate-token", async (c) => {
     return c.json({ success: true, token: newToken });
 });
 
-dashboardRoutes.get("/docs", (c) => {
-    return c.html(<Documentation />);
+dashboardRoutes.get("/docs", async (c) => {
+    const userId = c.get("userId");
+    const tenantId = c.get("tenantId");
+
+    // Get user's API token
+    let user = await getUserById(c.env.DB, userId, tenantId);
+    let aggregatorToken = user?.api_token;
+
+    if (!aggregatorToken) {
+        aggregatorToken = generateSecureToken();
+        await updateUserApiToken(c.env.DB, userId, aggregatorToken);
+    }
+
+    // Get base URL from request
+    const url = new URL(c.req.url);
+    const baseUrl = `${url.protocol}//${url.host}/api`;
+
+    return c.html(<Documentation baseUrl={baseUrl} aggregatorToken={aggregatorToken} />);
 });
 
 export default dashboardRoutes;

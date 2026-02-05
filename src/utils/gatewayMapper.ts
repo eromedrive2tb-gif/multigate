@@ -1,23 +1,28 @@
 import { UnifiedPaymentRequest, PaymentItem } from "../types";
 
 export function mapToWoovi(request: UnifiedPaymentRequest) {
-    const customer: any = {
-        name: request.payer.name,
-        email: request.payer.email,
-        phone: request.payer.phone?.replace(/\D/g, ''),
-    };
-
-    // taxID is optional for Woovi/OpenPix
-    if (request.payer.tax_id) {
-        customer.taxID = request.payer.tax_id.replace(/\D/g, '');
-    }
-
-    return {
+    const payload: any = {
         value: request.amount,
         correlationID: request.external_id || crypto.randomUUID(),
         comment: request.description,
-        customer,
     };
+
+    // Customer/payer is optional for Woovi/OpenPix
+    if (request.payer) {
+        const customer: any = {};
+
+        if (request.payer.name) customer.name = request.payer.name;
+        if (request.payer.email) customer.email = request.payer.email;
+        if (request.payer.phone) customer.phone = request.payer.phone.replace(/\D/g, '');
+        if (request.payer.tax_id) customer.taxID = request.payer.tax_id.replace(/\D/g, '');
+
+        // Only include customer if at least one field is provided
+        if (Object.keys(customer).length > 0) {
+            payload.customer = customer;
+        }
+    }
+
+    return payload;
 }
 
 export function mapToJunglePay(request: UnifiedPaymentRequest, aggregatorWebhookUrl?: string) {

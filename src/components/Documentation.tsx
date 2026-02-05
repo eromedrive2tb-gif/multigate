@@ -4,7 +4,12 @@ import { Layout } from "./Layout";
 import { Header } from "./organisms/Header";
 import { html } from "hono/html";
 
-export const Documentation = () => {
+interface DocumentationProps {
+    baseUrl: string;
+    aggregatorToken: string;
+}
+
+export const Documentation = ({ baseUrl, aggregatorToken }: DocumentationProps) => {
     return (
         <Layout title="API Documentation - MultiGate">
             <Header />
@@ -35,7 +40,7 @@ export const Documentation = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                     <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Base URL</h3>
-                        <code style={{
+                        <code id="base-url-display" style={{
                             background: 'rgba(0,0,0,0.3)',
                             padding: '0.5rem 0.75rem',
                             borderRadius: '8px',
@@ -44,22 +49,34 @@ export const Documentation = () => {
                             fontSize: '0.875rem',
                             wordBreak: 'break-all'
                         }}>
-                            https://your-domain.com/api
+                            {baseUrl}
                         </code>
                     </div>
 
                     <div style={{ background: 'rgba(168, 85, 247, 0.1)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
                         <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', color: 'var(--accent-secondary)' }}>Authentication</h3>
-                        <code style={{
-                            background: 'rgba(0,0,0,0.3)',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '8px',
-                            display: 'block',
-                            fontFamily: 'monospace',
-                            fontSize: '0.875rem'
-                        }}>
-                            Authorization: Bearer {'<your_api_token>'}
-                        </code>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
+                            <code id="auth-token-display" style={{
+                                background: 'rgba(0,0,0,0.3)',
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: '8px',
+                                flex: 1,
+                                fontFamily: 'monospace',
+                                fontSize: '0.75rem',
+                                wordBreak: 'break-all',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}>
+                                Bearer {aggregatorToken}
+                            </code>
+                            <button
+                                class="btn btn-outline"
+                                style={{ padding: '0.5rem 0.75rem', fontSize: '0.7rem', whiteSpace: 'nowrap' }}
+                                onclick="copyToken()"
+                            >
+                                <i data-lucide="copy" style={{ width: '12px', height: '12px' }}></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -153,47 +170,49 @@ export const Documentation = () => {
                                 </select>
                             </div>
 
-                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                                <h4 style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-                                    Payer Info
-                                </h4>
+                            <div id="payer-info-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0 }}>
+                                        Payer Info
+                                    </h4>
+                                    <span id="payer-info-note" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'none' }}>
+                                        (opcional para OpenPix)
+                                    </span>
+                                </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                            Name <span style={{ color: 'var(--error)' }}>*</span>
+                                        <label id="name-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                            Name <span id="name-required" style={{ color: 'var(--error)' }}>*</span>
                                         </label>
                                         <input
                                             type="text"
                                             id="doc-payer-name"
                                             placeholder="João da Silva"
-                                            value="João da Silva"
                                             onInput="updatePayload()"
                                         />
                                     </div>
 
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                            CPF/CNPJ <span style={{ color: 'var(--error)' }}>*</span>
+                                        <label id="taxid-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                            CPF/CNPJ <span id="taxid-required" style={{ color: 'var(--error)' }}>*</span>
                                         </label>
                                         <input
                                             type="text"
                                             id="doc-payer-taxid"
                                             placeholder="12345678900"
-                                            value="12345678900"
                                             onInput="updatePayload()"
                                         />
                                     </div>
 
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                            Email <span style={{ color: 'var(--error)' }}>*</span>
+                                        <label id="email-label" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                            Email <span id="email-required" style={{ color: 'var(--error)' }}>*</span>
                                         </label>
                                         <input
                                             type="email"
                                             id="doc-payer-email"
                                             placeholder="joao@email.com"
-                                            value="joao@email.com"
                                             onInput="updatePayload()"
                                         />
                                     </div>
@@ -218,14 +237,25 @@ export const Documentation = () => {
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                             <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Generated Payload</h3>
-                            <button
-                                class="btn btn-outline"
-                                style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}
-                                onclick="copyPayload()"
-                            >
-                                <i data-lucide="copy" style={{ width: '14px', height: '14px' }}></i>
-                                Copy
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    class="btn btn-outline"
+                                    style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}
+                                    onclick="copyPayload()"
+                                >
+                                    <i data-lucide="copy" style={{ width: '14px', height: '14px' }}></i>
+                                    Copy
+                                </button>
+                                <button
+                                    id="test-api-btn"
+                                    class="btn btn-primary"
+                                    style={{ padding: '0.5rem 1rem', fontSize: '0.75rem' }}
+                                    onclick="testApiRequest()"
+                                >
+                                    <i data-lucide="play" style={{ width: '14px', height: '14px' }}></i>
+                                    Test API
+                                </button>
+                            </div>
                         </div>
 
                         <pre id="payload-preview" style={{
@@ -234,12 +264,32 @@ export const Documentation = () => {
                             borderRadius: '12px',
                             border: '1px solid var(--border)',
                             overflow: 'auto',
-                            maxHeight: '400px',
+                            maxHeight: '300px',
                             fontSize: '0.8rem',
                             lineHeight: '1.6',
                             fontFamily: 'monospace'
                         }}>
                         </pre>
+
+                        {/* Test Result Section */}
+                        <div id="test-result-section" style={{ display: 'none', marginTop: '1rem' }}>
+                            <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <i data-lucide="terminal" style={{ width: '16px', height: '16px' }}></i>
+                                Test Result
+                            </h3>
+                            <pre id="test-result" style={{
+                                background: 'rgba(0,0,0,0.4)',
+                                padding: '1.25rem',
+                                borderRadius: '12px',
+                                border: '1px solid var(--border)',
+                                overflow: 'auto',
+                                maxHeight: '250px',
+                                fontSize: '0.8rem',
+                                lineHeight: '1.6',
+                                fontFamily: 'monospace'
+                            }}>
+                            </pre>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -517,32 +567,61 @@ export const Documentation = () => {
             {/* JavaScript for interactivity */}
             {html`
                 <script>
+                    // Store base URL and token
+                    const BASE_URL = document.getElementById('base-url-display')?.textContent?.trim() || '';
+                    const AUTH_TOKEN = document.getElementById('auth-token-display')?.textContent?.replace('Bearer ', '').trim() || '';
+
                     // Initialize payload on page load
                     document.addEventListener('DOMContentLoaded', function() {
                         updatePayload();
+                        updatePayerInfoLabels();
                         lucide.createIcons();
                     });
+
+                    function updatePayerInfoLabels() {
+                        const gateway = document.getElementById('doc-gateway').value;
+                        const payerNote = document.getElementById('payer-info-note');
+                        const nameRequired = document.getElementById('name-required');
+                        const taxidRequired = document.getElementById('taxid-required');
+                        const emailRequired = document.getElementById('email-required');
+                        
+                        if (gateway === 'openpix') {
+                            payerNote.style.display = 'inline';
+                            nameRequired.style.display = 'none';
+                            taxidRequired.style.display = 'none';
+                            emailRequired.style.display = 'none';
+                        } else {
+                            payerNote.style.display = 'none';
+                            nameRequired.style.display = 'inline';
+                            taxidRequired.style.display = 'inline';
+                            emailRequired.style.display = 'inline';
+                        }
+                    }
 
                     function updatePayload() {
                         const amount = document.getElementById('doc-amount').value || 1000;
                         const method = document.getElementById('doc-method').value || 'pix';
                         const description = document.getElementById('doc-description').value || 'Payment';
                         const gateway = document.getElementById('doc-gateway').value;
-                        const payerName = document.getElementById('doc-payer-name').value || 'Customer';
-                        const payerTaxId = document.getElementById('doc-payer-taxid').value || '00000000000';
-                        const payerEmail = document.getElementById('doc-payer-email').value || 'customer@email.com';
+                        const payerName = document.getElementById('doc-payer-name').value;
+                        const payerTaxId = document.getElementById('doc-payer-taxid').value;
+                        const payerEmail = document.getElementById('doc-payer-email').value;
                         const callback = document.getElementById('doc-callback').value;
 
                         const payload = {
                             amount: parseInt(amount),
                             method: method,
-                            description: description,
-                            payer: {
-                                name: payerName,
-                                tax_id: payerTaxId,
-                                email: payerEmail
-                            }
+                            description: description
                         };
+
+                        // For openpix, payer info is optional. For others, it's required.
+                        const hasPayer = payerName || payerEmail || payerTaxId;
+                        if (hasPayer || gateway !== 'openpix') {
+                            payload.payer = {};
+                            if (payerName) payload.payer.name = payerName;
+                            if (payerEmail) payload.payer.email = payerEmail;
+                            if (payerTaxId) payload.payer.tax_id = payerTaxId;
+                        }
 
                         if (gateway) {
                             payload.gateway_type = gateway;
@@ -553,6 +632,9 @@ export const Documentation = () => {
                         }
 
                         document.getElementById('payload-preview').textContent = JSON.stringify(payload, null, 2);
+                        
+                        // Update labels based on gateway
+                        updatePayerInfoLabels();
                     }
 
                     function copyPayload() {
@@ -567,6 +649,75 @@ export const Documentation = () => {
                                 lucide.createIcons();
                             }, 2000);
                         });
+                    }
+
+                    function copyToken() {
+                        const token = AUTH_TOKEN;
+                        navigator.clipboard.writeText(token).then(() => {
+                            const btn = event.target.closest('button');
+                            const originalHtml = btn.innerHTML;
+                            btn.innerHTML = '<i data-lucide="check" style="width: 12px; height: 12px;"></i>';
+                            lucide.createIcons();
+                            setTimeout(() => {
+                                btn.innerHTML = originalHtml;
+                                lucide.createIcons();
+                            }, 2000);
+                        });
+                    }
+
+                    async function testApiRequest() {
+                        const btn = document.getElementById('test-api-btn');
+                        const resultSection = document.getElementById('test-result-section');
+                        const resultPre = document.getElementById('test-result');
+                        
+                        // Show loading state
+                        const originalHtml = btn.innerHTML;
+                        btn.innerHTML = '<i data-lucide="loader" style="width: 14px; height: 14px;" class="spin"></i> Testing...';
+                        btn.disabled = true;
+                        lucide.createIcons();
+                        
+                        resultSection.style.display = 'block';
+                        resultPre.textContent = 'Sending request...';
+                        resultPre.style.borderColor = 'var(--border)';
+                        
+                        try {
+                            const payload = JSON.parse(document.getElementById('payload-preview').textContent);
+                            // Use window.location.origin for reliable URL in tunnels/different domains
+                            const apiUrl = window.location.origin + '/api/unified/charge';
+                            
+                            const response = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer ' + AUTH_TOKEN
+                                },
+                                body: JSON.stringify(payload)
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (response.ok && data.success) {
+                                resultPre.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                                resultPre.style.background = 'rgba(16, 185, 129, 0.05)';
+                            } else {
+                                resultPre.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                                resultPre.style.background = 'rgba(239, 68, 68, 0.05)';
+                            }
+                            
+                            resultPre.textContent = JSON.stringify(data, null, 2);
+                        } catch (error) {
+                            resultPre.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                            resultPre.style.background = 'rgba(239, 68, 68, 0.05)';
+                            resultPre.textContent = JSON.stringify({
+                                success: false,
+                                error: 'Request failed',
+                                message: error.message
+                            }, null, 2);
+                        } finally {
+                            btn.innerHTML = originalHtml;
+                            btn.disabled = false;
+                            lucide.createIcons();
+                        }
                     }
 
                     function showResponse(code) {
