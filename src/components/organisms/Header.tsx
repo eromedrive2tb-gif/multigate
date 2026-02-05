@@ -17,6 +17,7 @@ export const Header = ({ onLogout = "logout()" }: HeaderProps) => {
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
                     <a href="/dashboard" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.875rem' }}>Dashboard</a>
                     <a href="/dashboard/transactions" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.875rem' }}>Transactions</a>
+                    <a href="/dashboard/docs" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.875rem' }}>Documentation</a>
                 </div>
             </div>
             <Button

@@ -6,6 +6,7 @@ import { getGatewaysByTenant, getUserById, updateUserApiToken, getTransactionsBy
 import { generateSecureToken } from "../utils/crypto";
 import { Dashboard } from "../components/Dashboard";
 import { Transactions } from "../components/Transactions";
+import { Documentation } from "../components/Documentation";
 
 type Variables = {
     userId: number;
@@ -59,6 +60,10 @@ dashboardRoutes.post("/regenerate-token", async (c) => {
     const newToken = generateSecureToken();
     await updateUserApiToken(c.env.DB, userId, newToken);
     return c.json({ success: true, token: newToken });
+});
+
+dashboardRoutes.get("/docs", (c) => {
+    return c.html(<Documentation />);
 });
 
 export default dashboardRoutes;

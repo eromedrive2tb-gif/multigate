@@ -118,9 +118,14 @@ export const createTransaction = async (db: D1Database, data: {
   callbackUrl?: string;
   amount: number;
 }) => {
+  // D1 doesn't accept undefined values, convert to null
+  const gatewayTxId = data.gatewayTransactionId ?? null;
+  const extRef = data.externalRef ?? null;
+  const callbackUrl = data.callbackUrl ?? null;
+
   const result = await db.prepare(
     "INSERT INTO transactions (tenant_id, gateway_type, gateway_transaction_id, external_ref, callback_url, amount) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
-  ).bind(data.tenantId, data.gatewayType, data.gatewayTransactionId, data.externalRef, data.callbackUrl, data.amount).first<{ id: number }>();
+  ).bind(data.tenantId, data.gatewayType, gatewayTxId, extRef, callbackUrl, data.amount).first<{ id: number }>();
   return result?.id;
 };
 
