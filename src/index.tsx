@@ -238,6 +238,7 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
             standardizedResponse.pix = {
                 qrcode: result.charge?.qrCodeString,
                 image: result.charge?.qrCodeImage,
+                paymentLinkUrl: result.charge?.paymentLinkUrl,
             };
         } else if (gateway.type === 'diasmarketplace') {
             standardizedResponse.pix = {
@@ -247,6 +248,7 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
             standardizedResponse.pix = {
                 qrcode: result.pix?.qrcode,
                 image: result.pix?.qrcode_url,
+                secureUrl: result.secureUrl,
             };
         }
 
