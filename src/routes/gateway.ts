@@ -87,28 +87,34 @@ gatewayRoutes.post("/", async (c) => {
 
         console.log(`Registering Woovi webhook at ${webhookUrl}`);
 
-        const payload = {
-          name: 'Multigate Aggregator Webhook',
-          url: webhookUrl,
-          isActive: true,
-          event: 'OPENPIX:CHARGE_COMPLETED' // Subscribing to completed events
-        };
+        const events = ['OPENPIX:CHARGE_CREATED', 'OPENPIX:CHARGE_COMPLETED', 'OPENPIX:CHARGE_EXPIRED'];
 
-        const response = await fetch('https://api.woovi.com/api/openpix/v1/webhook', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': credentials.appId as string
-          },
-          body: JSON.stringify(payload)
-        });
+        for (const event of events) {
+          console.log(`Registering Woovi webhook for event ${event} at ${webhookUrl}`);
 
-        const data = await response.json();
-        console.log('Woovi webhook registration response:', JSON.stringify(data));
+          const payload = {
+            webhook: {
+              name: `Multigate Webhook - ${event}`,
+              url: webhookUrl,
+              isActive: true,
+              event: event
+            }
+          };
 
-        // We could store the webhook ID if needed, but for now we just ensure it's created.
+          const response = await fetch('https://api.woovi.com/api/openpix/v1/webhook', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': credentials.appId as string
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json();
+          console.log(`Woovi webhook registration response for ${event}:`, JSON.stringify(data));
+        }
       } catch (webhookError) {
-        console.error('Failed to auto-register Woovi webhook:', webhookError);
+        console.error('Failed to auto-register Woovi webhooks:', webhookError);
         // We don't block gateway creation, but we log the error.
       }
     }
@@ -160,6 +166,70 @@ gatewayRoutes.delete("/:id", async (c) => {
     return c.json({ success: true, message: "Gateway deleted successfully" });
   } catch (error) {
     return c.json({ error: "Failed to delete gateway" }, 500);
+  }
+});
+
+// Manual Webhook Registration for Woovi
+gatewayRoutes.post("/:id/register-webhook", async (c) => {
+  const gatewayId = parseInt(c.req.param("id"));
+  const tenantId = c.get("tenantId");
+
+  if (isNaN(gatewayId)) {
+    return c.json({ error: "Invalid gateway ID" }, 400);
+  }
+
+  // Check if gateway exists and belongs to tenant
+  const gateway = await getGatewayById(c.env.DB, gatewayId, tenantId);
+  if (!gateway) {
+    return c.json({ error: "Gateway not found" }, 404);
+  }
+
+  if (gateway.type !== 'openpix') {
+    return c.json({ error: "Manual webhook registration only supported for Woovi (OpenPix)" }, 400);
+  }
+
+  const creds = JSON.parse(gateway.credentials_json);
+  if (!creds.appId) {
+    return c.json({ error: "Woovi App ID not found in credentials" }, 400);
+  }
+
+  try {
+    const url = new URL(c.req.url);
+    const webhookUrl = `${url.protocol}//${url.host}/api/webhooks/woovi`;
+
+    console.log(`Manual Webhook Registration for Gateway ${gatewayId} at ${webhookUrl}`);
+
+    const events = ['OPENPIX:CHARGE_CREATED', 'OPENPIX:CHARGE_COMPLETED', 'OPENPIX:CHARGE_EXPIRED'];
+    const results = [];
+
+    for (const event of events) {
+      const payload = {
+        webhook: {
+          name: `Multigate Webhook - ${event} (Manual)`,
+          url: webhookUrl,
+          isActive: true,
+          event: event
+        }
+      };
+
+      const response = await fetch('https://api.woovi.com/api/openpix/v1/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': creds.appId
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      console.log(`Woovi manual webhook registration response for ${event}:`, JSON.stringify(data));
+      results.push({ event, status: response.status, data });
+    }
+
+    return c.json({ success: true, message: "Webhooks registered successfully", results });
+  } catch (error) {
+    console.error('Error in manual webhook registration:', error);
+    return c.json({ error: "Failed to register webhooks", details: error instanceof Error ? error.message : String(error) }, 500);
   }
 });
 

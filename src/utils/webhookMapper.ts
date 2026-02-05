@@ -20,13 +20,15 @@ export function mapWooviWebhook(payload: any): UnifiedWebhookPayload {
 
     // Determine Status
     const event = payload.event;
-    let status = charge.status; // e.g. 'COMPLETED', 'ACTIVE'
+    let status = charge.status; // e.g. 'COMPLETED', 'ACTIVE', 'EXPIRED'
 
     // Normalize Status
     if (event === 'OPENPIX:CHARGE_COMPLETED' || event === 'woovi:CHARGE_COMPLETED' || status === 'COMPLETED') {
         status = 'PAID';
-    } else if (status === 'ACTIVE') {
+    } else if (event === 'OPENPIX:CHARGE_CREATED' || status === 'ACTIVE') {
         status = 'PENDING';
+    } else if (event === 'OPENPIX:CHARGE_EXPIRED' || status === 'EXPIRED') {
+        status = 'EXPIRED';
     }
 
     // Extract identifiers

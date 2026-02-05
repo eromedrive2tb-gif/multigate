@@ -22,6 +22,12 @@ webhookRoutes.post("/woovi", async (c) => {
         console.log("Received Woovi Webhook:", JSON.stringify(payload));
 
         // Woovi sends { event: ..., charge: { correlationID: ... } }
+        // During registration, it sends { evento: 'teste_webhook', ... }
+        if (payload.evento === 'teste_webhook' || payload.event === 'teste_webhook') {
+            console.log("Acknowledging Woovi test ping");
+            return c.json({ success: true, message: "Test ping received" });
+        }
+
         const charge = payload.charge || payload;
         const correlationID = charge.correlationID;
 
