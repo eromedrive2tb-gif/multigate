@@ -14,9 +14,10 @@ export const Header = ({ onLogout = "logout()" }: HeaderProps) => {
                 <Heading level={1} style={{ fontSize: '2rem', marginBottom: '0.25rem', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     MultiGate Aggregate
                 </Heading>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    Manage your payment infrastructure across multiple providers.
-                </p>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                    <a href="/dashboard" style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.875rem' }}>Dashboard</a>
+                    <a href="/dashboard/transactions" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontWeight: 500, fontSize: '0.875rem' }}>Transactions</a>
+                </div>
             </div>
             <Button
                 variant="danger"

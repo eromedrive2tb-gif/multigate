@@ -78,6 +78,41 @@ gatewayRoutes.post("/", async (c) => {
 
   try {
     console.log('Creating gateway:', { name, type, tenantId });
+
+    // Auto-register Webhook for Woovi
+    if (type === 'openpix' && credentials.appId) {
+      try {
+        const url = new URL(c.req.url); // Use request URL to determine host
+        const webhookUrl = `${url.protocol}//${url.host}/api/webhooks/woovi`;
+
+        console.log(`Registering Woovi webhook at ${webhookUrl}`);
+
+        const payload = {
+          name: 'Multigate Aggregator Webhook',
+          url: webhookUrl,
+          isActive: true,
+          event: 'OPENPIX:CHARGE_COMPLETED' // Subscribing to completed events
+        };
+
+        const response = await fetch('https://api.woovi.com/api/openpix/v1/webhook', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': credentials.appId as string
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        console.log('Woovi webhook registration response:', JSON.stringify(data));
+
+        // We could store the webhook ID if needed, but for now we just ensure it's created.
+      } catch (webhookError) {
+        console.error('Failed to auto-register Woovi webhook:', webhookError);
+        // We don't block gateway creation, but we log the error.
+      }
+    }
+
     await createGateway(c.env.DB, name, type, tenantId, credentials);
     console.log('Gateway created successfully');
     return c.json({ success: true, message: "Gateway created successfully" });

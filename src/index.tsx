@@ -52,6 +52,20 @@ async function initializeDatabase(env: { DB: any }) {
       created_at INTEGER DEFAULT (unixepoch()),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`).run();
+
+        // Create transactions table
+        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            gateway_type TEXT NOT NULL,
+            gateway_transaction_id TEXT,
+            external_ref TEXT,
+            callback_url TEXT,
+            amount INTEGER,
+            status TEXT DEFAULT 'PENDING',
+            created_at INTEGER DEFAULT (unixepoch()),
+            updated_at INTEGER DEFAULT (unixepoch())
+        )`).run();
     } catch (error) {
         console.error('Database initialization error:', error);
     }
@@ -90,8 +104,12 @@ type ChargeVariables = {
 };
 
 import { UnifiedPaymentRequest } from "./types";
-import { getGatewaysByTenant, getGatewayById, getGatewayByType } from "./db/queries";
+import { getGatewaysByTenant, getGatewayById, getGatewayByType, createTransaction } from "./db/queries";
 import { mapToWoovi, mapToJunglePay, mapToDiasMarketplace } from "./utils/gatewayMapper";
+import webhookRoutes from "./routes/webhooks";
+
+// Register Webhook Routes - No Auth required (gateways call this)
+app.route("/api/webhooks", webhookRoutes);
 
 app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: { DB: any }; Variables: ChargeVariables }>) => {
     const tenantId = c.get("tenantId");
@@ -115,6 +133,14 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
         const credentials = JSON.parse(gateway.credentials_json);
         let mappedPayload;
         let endpoint = '';
+        const externalRef = body.external_id || crypto.randomUUID();
+        // Ensure request has identifiers we can track
+        body.external_id = externalRef;
+
+        // Determine Aggregator Base URL for webhooks
+        // In production, this should come from c.env.API_BASE_URL
+        const url = new URL(c.req.url);
+        const baseUrl = `${url.protocol}//${url.host}`;
 
         // 2. Map payload and set endpoint based on gateway type
         switch (gateway.type) {
@@ -123,61 +149,100 @@ app.post("/api/unified/charge", apiAuthenticate, async (c: Context<{ Bindings: {
                 endpoint = 'https://api.woovi.com/api/v1/charge';
                 break;
             case 'junglepay':
-                mappedPayload = mapToJunglePay(body);
+                mappedPayload = mapToJunglePay(body, `${baseUrl}/api/webhooks/junglepay`);
                 endpoint = 'https://api.junglepagamentos.com/v1/transactions';
                 break;
             case 'diasmarketplace':
-                mappedPayload = mapToDiasMarketplace(body);
+                mappedPayload = mapToDiasMarketplace(body, `${baseUrl}/api/webhooks/diasmarketplace`);
                 endpoint = 'https://api.diasmarketplace.com.br/v1/payment';
                 break;
             default:
                 return c.json({ success: false, error: 'Unsupported gateway type' }, 400);
         }
 
-        // 3. Process the charge (Actual fetch for OpenPix)
+        // 3. Process the charge
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+        };
+
         if (gateway.type === 'openpix') {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Authorization': credentials.appId,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(mappedPayload)
-            });
-
-            let result;
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                result = await response.json();
-            } else {
-                result = await response.text();
-            }
-
-            if (!response.ok) {
-                return c.json({
-                    success: false,
-                    error: `Woovi API error: ${response.status}`,
-                    details: result
-                }, response.status as any);
-            }
-
-            return c.json({
-                success: true,
-                gateway: 'openpix',
-                gatewayResponse: result,
-                message: 'Charge created successfully via OpenPix'
-            });
+            headers['Authorization'] = credentials.appId;
+        } else if (gateway.type === 'junglepay') {
+            headers['Authorization'] = `Bearer ${credentials.jungleSecretKey}`;
+        } else if (gateway.type === 'diasmarketplace') {
+            headers['Authorization'] = `Bearer ${credentials.diasApiKey}`;
         }
 
-        // Mocking responses for other gateways for now
-        return c.json({
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(mappedPayload)
+        });
+
+        let result: any;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            result = await response.json();
+        } else {
+            result = await response.text();
+        }
+
+        if (!response.ok) {
+            return c.json({
+                success: false,
+                gateway: gateway.type,
+                error: `${gateway.type} API error: ${response.status}`,
+                details: result
+            }, response.status as any);
+        }
+
+        // Extract gateway transaction ID if possible
+        let gatewayTransactionId = null;
+        if (gateway.type === 'openpix') {
+            // Woovi uses correlationID which is our externalRef, but they send back 'charge' object
+            gatewayTransactionId = result.charge?.correlationID;
+        } else {
+            // Both JunglePay and Dias return 'id'
+            gatewayTransactionId = result.id || result.payId; // Dias example shows 'pay_...' sometimes?
+            // Actually Dias example shows "id": "pay_01..."
+        }
+
+
+        // 4. Save Transaction to DB
+        await createTransaction(c.env.DB, {
+            tenantId,
+            gatewayType: gateway.type,
+            gatewayTransactionId: gatewayTransactionId ? String(gatewayTransactionId) : undefined,
+            externalRef: externalRef,
+            callbackUrl: body.callback_url,
+            amount: body.amount
+        });
+
+
+        // Standardize response based on gateway
+        let standardizedResponse: any = {
             success: true,
             gateway: gateway.type,
-            gatewayTransactionId: `gw_${Math.random().toString(36).substring(7)}`,
-            amount: body.amount,
-            message: 'Payment processed successfully through unified API (Mock)',
-            mappedPayload
-        });
+            gatewayResponse: result,
+        };
+
+        if (gateway.type === 'openpix') {
+            standardizedResponse.pix = {
+                qrcode: result.charge?.qrCodeString,
+                image: result.charge?.qrCodeImage,
+            };
+        } else if (gateway.type === 'diasmarketplace') {
+            standardizedResponse.pix = {
+                qrcode: result.data?.copypaste,
+            };
+        } else if (gateway.type === 'junglepay') {
+            standardizedResponse.pix = {
+                qrcode: result.pix?.qrcode,
+                image: result.pix?.qrcode_url,
+            };
+        }
+
+        return c.json(standardizedResponse);
 
     } catch (error) {
         console.error('Unified charge error:', error);

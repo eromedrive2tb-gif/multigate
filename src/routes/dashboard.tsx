@@ -2,9 +2,10 @@
 
 import { Hono } from "hono";
 import { authenticate } from "../middleware/auth";
-import { getGatewaysByTenant, getUserById, updateUserApiToken } from "../db/queries";
+import { getGatewaysByTenant, getUserById, updateUserApiToken, getTransactionsByTenant } from "../db/queries";
 import { generateSecureToken } from "../utils/crypto";
 import { Dashboard } from "../components/Dashboard";
+import { Transactions } from "../components/Transactions";
 
 type Variables = {
     userId: number;
@@ -41,6 +42,15 @@ dashboardRoutes.get("/", async (c) => {
             configuredTypes={configuredTypes}
             aggregatorToken={aggregatorToken}
         />
+    );
+});
+
+dashboardRoutes.get("/transactions", async (c) => {
+    const tenantId = c.get("tenantId");
+    const transactions = await getTransactionsByTenant(c.env.DB, tenantId);
+
+    return c.html(
+        <Transactions transactions={transactions} />
     );
 });
 

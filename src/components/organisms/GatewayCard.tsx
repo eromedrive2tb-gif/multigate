@@ -44,6 +44,10 @@ export const GatewayCard = ({ gateway }: GatewayCardProps) => {
                     {gateway.type === 'openpix' && (
                         <>
                             <FormField label="App ID" id={`openpix-appId-${gateway.id}`} name="credentials.appId" value={creds.appId} />
+                            <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '-0.5rem', background: 'rgba(16, 185, 129, 0.1)', padding: '0.5rem', borderRadius: '6px' }}>
+                                ✓ Webhook auto-configured: <br />
+                                <span style={{ fontFamily: 'monospace' }}>/api/webhooks/woovi</span>
+                            </div>
                         </>
                     )}
 

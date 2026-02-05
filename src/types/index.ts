@@ -66,6 +66,13 @@ export interface CreditCardData {
   installments: number;
 }
 
+export interface PaymentItem {
+  name: string;
+  price: number; // in cents
+  quantity: number;
+  type?: 'PHYSICAL' | 'DIGITAL';
+}
+
 export interface UnifiedPaymentRequest {
   amount: number; // in cents
   method: 'pix' | 'credit_card' | 'boleto';
@@ -75,6 +82,7 @@ export interface UnifiedPaymentRequest {
   callback_url?: string;
   payer: Payer;
   credit_card?: CreditCardData;
+  items?: PaymentItem[];
 }
 
 export interface GatewayCardProps {

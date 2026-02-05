@@ -1,4 +1,4 @@
-import { UnifiedPaymentRequest } from "../types";
+import { UnifiedPaymentRequest, PaymentItem } from "../types";
 
 export function mapToWoovi(request: UnifiedPaymentRequest) {
     return {
@@ -14,7 +14,7 @@ export function mapToWoovi(request: UnifiedPaymentRequest) {
     };
 }
 
-export function mapToJunglePay(request: UnifiedPaymentRequest) {
+export function mapToJunglePay(request: UnifiedPaymentRequest, aggregatorWebhookUrl?: string) {
     const isCnpj = request.payer.tax_id.replace(/\D/g, '').length > 11;
     const paymentMethodMap: Record<string, string> = {
         pix: 'pix',
@@ -42,7 +42,8 @@ export function mapToJunglePay(request: UnifiedPaymentRequest) {
                 tangible: false,
             },
         ],
-        postbackUrl: request.callback_url,
+        // CRITICAL: Send to Aggregator, not directly to User.
+        postbackUrl: aggregatorWebhookUrl,
     };
 
     if (request.method === 'credit_card' && request.credit_card) {
@@ -55,7 +56,7 @@ export function mapToJunglePay(request: UnifiedPaymentRequest) {
     return payload;
 }
 
-export function mapToDiasMarketplace(request: UnifiedPaymentRequest) {
+export function mapToDiasMarketplace(request: UnifiedPaymentRequest, aggregatorWebhookUrl?: string) {
     const methodMap: Record<string, string> = {
         pix: 'PIX',
         credit_card: 'CREDIT_CARD',
@@ -66,23 +67,29 @@ export function mapToDiasMarketplace(request: UnifiedPaymentRequest) {
         amount: request.amount,
         currency: 'BRL',
         method: methodMap[request.method],
-        description: request.description,
-        externalRef: request.external_id,
-        notificationUrl: request.callback_url,
+        description: request.description || 'Pagamento via Multigate',
+        externalRef: request.external_id || crypto.randomUUID(),
+        // CRITICAL: Send to Aggregator, not directly to User.
+        notificationUrl: aggregatorWebhookUrl,
         payer: {
             name: request.payer.name,
             taxId: request.payer.tax_id.replace(/\D/g, ''),
             email: request.payer.email,
             phone: request.payer.phone?.replace(/\D/g, ''),
         },
-        items: [
-            {
-                quantity: 1,
-                name: request.description,
-                price: request.amount,
-                type: 'DIGITAL',
-            },
-        ],
+        items: request.items?.map((item: PaymentItem) => ({
+            quantity: item.quantity,
+            name: item.name,
+            price: item.price,
+            type: 'DIGITAL', // Defaulting to DIGITAL as it's a software service context
+        })) || [
+                {
+                    quantity: 1,
+                    name: request.description || 'Item de pagamento',
+                    price: request.amount,
+                    type: 'DIGITAL',
+                },
+            ],
     };
 
     if (request.method === 'credit_card' && request.credit_card) {

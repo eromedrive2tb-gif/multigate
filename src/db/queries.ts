@@ -108,3 +108,49 @@ export const deleteGateway = async (db: D1Database, gatewayId: number, tenantId:
 export const getAllowedGatewayTypes = (): Array<'openpix' | 'junglepay' | 'diasmarketplace'> => {
   return ['openpix', 'junglepay', 'diasmarketplace'];
 };
+
+// Transaction functions
+export const createTransaction = async (db: D1Database, data: {
+  tenantId: string;
+  gatewayType: string;
+  gatewayTransactionId?: string;
+  externalRef?: string;
+  callbackUrl?: string;
+  amount: number;
+}) => {
+  const result = await db.prepare(
+    "INSERT INTO transactions (tenant_id, gateway_type, gateway_transaction_id, external_ref, callback_url, amount) VALUES (?, ?, ?, ?, ?, ?) RETURNING id"
+  ).bind(data.tenantId, data.gatewayType, data.gatewayTransactionId, data.externalRef, data.callbackUrl, data.amount).first<{ id: number }>();
+  return result?.id;
+};
+
+export const getTransactionByGatewayId = async (db: D1Database, gatewayTransactionId: string) => {
+  return await db.prepare(
+    "SELECT * FROM transactions WHERE gateway_transaction_id = ?"
+  ).bind(gatewayTransactionId).first<any>();
+};
+
+export const getTransactionByExternalRef = async (db: D1Database, externalRef: string) => {
+  return await db.prepare(
+    "SELECT * FROM transactions WHERE external_ref = ?"
+  ).bind(externalRef).first<any>();
+};
+
+export const updateTransactionStatus = async (db: D1Database, id: number, status: string) => {
+  await db.prepare(
+    "UPDATE transactions SET status = ?, updated_at = unixepoch() WHERE id = ?"
+  ).bind(status, id).run();
+};
+
+export const updateTransactionGatewayId = async (db: D1Database, id: number, gatewayTransactionId: string) => {
+  await db.prepare(
+    "UPDATE transactions SET gateway_transaction_id = ?, updated_at = unixepoch() WHERE id = ?"
+  ).bind(gatewayTransactionId, id).run();
+};
+
+export const getTransactionsByTenant = async (db: D1Database, tenantId: string, limit: number = 50, offset: number = 0) => {
+  const result = await db.prepare(
+    "SELECT * FROM transactions WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
+  ).bind(tenantId, limit, offset).all();
+  return result.results;
+};
